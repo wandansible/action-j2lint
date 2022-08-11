@@ -1,0 +1,6 @@
+---
+name: Lint Jinja2
+description: Lint Jinja2 files
+runs:
+  using: docker
+  image: Dockerfile
