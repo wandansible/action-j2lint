@@ -6,10 +6,10 @@ Lint jinja2 template files using [j2lint](https://github.com/aristanetworks/j2li
 
 | Environment variable    | Default                                     | Description |
 | ----------------------- | ------------------------------------------- | ----------- |
-| `J2LINT_FILES_REGEX`    | `'^.*\.(j2\|jinja2\|jinja)$'`               | Regex for files to be checked |
+| `J2LINT_FILES_REGEX`    | `'^.*\.(j2\|jinja2\|jinja)$'`               | Regular expression for files to be checked |
 | `J2LINT_IGNORE_RULES`   | `""`                                        | Space-separated list of j2lint rules to ignore |
 | `J2LINT_WARNING_RULES`  | `""`                                        | Space-separated list of j2lint rules be shown as warnings |
-| `VALIDATE_ALL_CODEBASE` | `"false"`                                   | Whether or not to check all jinja2 files in the repository |
+| `VALIDATE_ALL_CODEBASE` | `"false"`                                   | Whether to check all jinja2 files in the repository or just new/edited files (in reference to `DEFAULT_BRANCH`) |
 | `DEFAULT_BRANCH`        | `"main"`                                    | The default branch of the repository |
 
 ## Sample usage
