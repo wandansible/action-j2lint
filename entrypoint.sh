@@ -16,39 +16,6 @@ J2LINT_WARNING_RULES="${J2LINT_WARNING_RULES:-$default_warning_rules}"
 VALIDATE_ALL_CODEBASE="${VALIDATE_ALL_CODEBASE:-$default_validate_all_codebase}"
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-$default_branch}"
 
-if [ "${VALIDATE_ALL_CODEBASE}" = "true" ]; then
-    git_files_cmd="git ls-tree --name-only -r HEAD"
-else
-    git fetch --quiet origin "${DEFAULT_BRANCH}"
-    if [ -e ".git/shallow" ]; then
-        git fetch --quiet --unshallow origin "${GITHUB_SHA}"
-    fi
-    git checkout --quiet "${DEFAULT_BRANCH}"
-    git checkout --quiet "${GITHUB_SHA}"
-
-    status=0
-    git_base="$(git merge-base "${GITHUB_SHA}" "${DEFAULT_BRANCH}")" || status=$?
-    if [ ! "${status}" = "0" ] || [ -z "${git_base}" ]; then
-        git_base="${DEFAULT_BRANCH}"
-    fi
-
-    git_files_cmd="git diff --name-only ${GITHUB_SHA} ${git_base}"
-fi
-
-echo "Getting files from command: ${git_files_cmd}"
-all_files="$(${git_files_cmd})"
-echo ""
-
-echo "Building jinja2 file list"
-echo "-------------------------"
-check_files=""
-for file in ${all_files}; do
-    if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]]; then
-        echo "${file}"
-        check_files="${check_files} ${file}"
-    fi
-done
-
 lint_cmd="j2lint --stdin --json"
 
 if [ -n "${J2LINT_IGNORE_RULES}" ]; then
@@ -59,37 +26,74 @@ if [ -n "${J2LINT_WARNING_RULES}" ]; then
     lint_cmd="${lint_cmd} --warn ${J2LINT_WARNING_RULES}"
 fi
 
+echo "Lint command: ${lint_cmd}"
+
+if ! echo "" | ${lint_cmd} > /dev/null; then
+    echo "Invalid j2lint arguments provided, exiting" >&2
+    exit 3
+fi
+
+echo ""
+echo "Building jinja2 file list"
+
+if [ "${VALIDATE_ALL_CODEBASE}" = "true" ]; then
+    git_files_cmd="git ls-tree --name-only -r HEAD"
+else
+    git fetch --quiet origin "${DEFAULT_BRANCH}"
+    if [ -e ".git/shallow" ]; then
+        git fetch --quiet --unshallow origin "${GITHUB_SHA}"
+    fi
+    git checkout --quiet "${DEFAULT_BRANCH}"
+    git checkout --quiet "${GITHUB_SHA}"
+
+    if ! git_base="$(git merge-base "${GITHUB_SHA}" "${DEFAULT_BRANCH}")" || [ -z "${git_base}" ]; then
+        git_base="${DEFAULT_BRANCH}"
+    fi
+
+    git_files_cmd="git diff --name-only ${GITHUB_SHA} ${git_base}"
+fi
+
+echo "Getting files from command: ${git_files_cmd}"
+all_files="$(${git_files_cmd})"
+
+check_files=""
+for file in ${all_files}; do
+    if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]]; then
+        echo "${file}"
+        check_files="${check_files} ${file}"
+    fi
+done
+
 if [ -z "${check_files}" ]; then
     echo "No jinja2 files to check"
-else
-    echo ""
-    echo "Lint command: ${lint_cmd}"
 fi
 echo ""
 
-exit_code=0
+lint_errors=0
+lint_warnings=0
 for file in ${check_files}; do
     echo "Checking file: ${file}"
 
-    lint_result="$(${lint_cmd} < "${file}")" || exit_code=$?
+    lint_result="$(${lint_cmd} < "${file}" || true)"
 
-    if [ ! "${exit_code}" = "0" ] && [ ! "${exit_code}" = "2" ] || [ -z "${lint_result}" ]; then
-        echo "Lint command failed, exiting"
-        exit "${exit_code}"
-    fi
-
-    echo "${lint_result}" | jq -r '.ERRORS[] | "::error file='"${file}"',line=\(.line_number)::\(.message) (\(.id))"'
-    echo "${lint_result}" | jq -r '.WARNINGS[] | "::warning file='"${file}"',line=\(.line_number)::\(.message) (\(.id))"'
+    echo "${lint_result}" | \
+        jq -r '.ERRORS[] | "::error file='"${file}"',line=\(.line_number)::\(.message) (\(.id))"'
+    echo "${lint_result}" | \
+        jq -r '.WARNINGS[] | "::warning file='"${file}"',line=\(.line_number)::\(.message) (\(.id))"'
 
     errors="$(echo "${lint_result}" | jq -r '.ERRORS | length')"
+    lint_errors=$((lint_errors + errors))
     warnings="$(echo "${lint_result}" | jq -r '.WARNINGS | length')"
+    lint_warnings=$((lint_warnings + warnings))
+
     echo "Linted ${file} with ${errors} error(s) and ${warnings} warning(s)"
     echo ""
 done
 
-if [ "${exit_code}" = "0" ]; then
-    echo "All jinja2 files linted successfully"
-else
+echo "Total errors: ${lint_errors}"
+echo "Total warnings: ${lint_warnings}"
+
+if [ "${lint_errors}" -gt 0 ]; then
     echo "Exiting with jinja2 linting errors"
+    exit 2
 fi
-exit "${exit_code}"
