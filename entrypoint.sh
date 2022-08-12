@@ -4,7 +4,7 @@ set -euo pipefail
 
 PATH="/opt/venv/bin:${PATH}"
 
-default_files_regex='^.*\.(j2\|jinja2\|jinja)$'
+default_files_regex='^.*\.(j2|jinja2|jinja)$'
 default_ignore_rules=""
 default_warning_rules=""
 default_validate_all_codebase="false"
