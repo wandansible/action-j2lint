@@ -37,28 +37,29 @@ echo ""
 echo "Building jinja2 file list"
 
 if [ "${VALIDATE_ALL_CODEBASE}" = "true" ]; then
-    git_files_cmd="git ls-tree --name-only -r HEAD"
+    all_files="$(git ls-tree --name-only -r HEAD)"
 else
-    git fetch --quiet origin "${DEFAULT_BRANCH}"
-    if [ -e ".git/shallow" ]; then
-        git fetch --quiet --unshallow origin "${GITHUB_SHA}"
+    if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+        GITHUB_SHA="$(jq -r .pull_request.head.sha < "${GITHUB_EVENT_PATH}")"
     fi
+
     git checkout --quiet "${DEFAULT_BRANCH}"
     git checkout --quiet "${GITHUB_SHA}"
 
-    if ! git_base="$(git merge-base "${GITHUB_SHA}" "${DEFAULT_BRANCH}")" || [ -z "${git_base}" ]; then
-        git_base="${DEFAULT_BRANCH}"
+    if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+        all_files="$(git diff-tree --no-commit-id --name-only -r "${GITHUB_SHA}")"
+
+        if [ -z "${all_files}" ]; then
+            all_files="$(git diff --name-only --diff-filter=d "${DEFAULT_BRANCH}...${GITHUB_SHA}")"
+        fi
+    else
+        all_files="$(git diff --name-only --diff-filter=d "${DEFAULT_BRANCH}...${GITHUB_SHA}")"
     fi
-
-    git_files_cmd="git diff --name-only ${GITHUB_SHA} ${git_base}"
 fi
-
-echo "Getting files from command: ${git_files_cmd}"
-all_files="$(${git_files_cmd})"
 
 check_files=""
 for file in ${all_files}; do
-    if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]]; then
+    if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]] && [ -f "${file}" ]; then
         echo "${file}"
         check_files="${check_files} ${file}"
     fi
