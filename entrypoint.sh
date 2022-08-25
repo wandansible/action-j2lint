@@ -26,19 +26,24 @@ if [ -n "${J2LINT_WARNING_RULES}" ]; then
     lint_cmd="${lint_cmd} --warn ${J2LINT_WARNING_RULES}"
 fi
 
-echo "Lint command: ${lint_cmd}"
-
-if ! echo "" | ${lint_cmd} > /dev/null; then
+if ! lint_cmd_check="$(echo "" | ${lint_cmd} 2>&1)"; then
+    echo "Invalid arguments provided for lint command: ${lint_cmd}"
+    echo "Command output:"
+    echo "------"
+    echo "${lint_cmd_check}"
+    echo "------"
+    echo ""
     echo "Invalid j2lint arguments provided, exiting" >&2
     exit 3
 fi
 
-echo ""
-echo "Building jinja2 file list"
-
 if [ "${VALIDATE_ALL_CODEBASE}" = "true" ]; then
+    echo "Linting entire code base"
+
     all_files="$(git ls-tree --name-only -r HEAD)"
 else
+    echo "Linting new or changed files"
+
     if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
         GITHUB_SHA="$(jq -r .pull_request.head.sha < "${GITHUB_EVENT_PATH}")"
     fi
@@ -57,22 +62,29 @@ else
     fi
 fi
 
+echo ""
+echo "Generated file list:"
 check_files=""
 for file in ${all_files}; do
     if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]] && [ -f "${file}" ]; then
-        echo "${file}"
+        echo "  * ${file}"
         check_files="${check_files} ${file}"
     fi
 done
 
 if [ -z "${check_files}" ]; then
     echo "No jinja2 files to check"
+    exit 0
+else
+    echo ""
+    echo "Checking each jinja2 file with lint command: ${lint_cmd}"
 fi
-echo ""
 
 lint_errors=0
 lint_warnings=0
 for file in ${check_files}; do
+    echo ""
+    echo "------"
     echo "Checking file: ${file}"
 
     lint_result="$(${lint_cmd} < "${file}" || true)"
@@ -88,9 +100,10 @@ for file in ${check_files}; do
     lint_warnings=$((lint_warnings + warnings))
 
     echo "Linted ${file} with ${errors} error(s) and ${warnings} warning(s)"
-    echo ""
+    echo "------"
 done
 
+echo ""
 echo "Total errors: ${lint_errors}"
 echo "Total warnings: ${lint_warnings}"
 
