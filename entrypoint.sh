@@ -60,10 +60,14 @@ else
     else
         all_files="$(git diff --name-only --diff-filter=d "${DEFAULT_BRANCH}...${GITHUB_SHA}")"
     fi
+
+    echo ""
+    echo "New or changed files detected by git:"
+    echo "${all_files}"
 fi
 
 echo ""
-echo "Generated file list:"
+echo "Jijna2 files to lint:"
 check_files=""
 for file in ${all_files}; do
     if [[ "${file}" =~ ${J2LINT_FILES_REGEX} ]] && [ -f "${file}" ]; then
@@ -84,10 +88,13 @@ lint_errors=0
 lint_warnings=0
 for file in ${check_files}; do
     echo ""
-    echo "------"
+    echo "-----------------------------------------"
     echo "Checking file: ${file}"
-
+    echo "Command output:"
+    echo "------"
     lint_result="$(${lint_cmd} < "${file}" || true)"
+    echo "${lint_result}"
+    echo "------"
 
     echo "${lint_result}" | \
         jq -r '.ERRORS[] | "::error file='"${file}"',line=\(.line_number)::\(.message) (\(.id))"'
@@ -100,7 +107,7 @@ for file in ${check_files}; do
     lint_warnings=$((lint_warnings + warnings))
 
     echo "Linted ${file} with ${errors} error(s) and ${warnings} warning(s)"
-    echo "------"
+    echo "-----------------------------------------"
 done
 
 echo ""
