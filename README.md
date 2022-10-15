@@ -36,5 +36,5 @@ jobs:
         with:
           fetch-depth: 0
       - name: Lint jinja2 files
-        uses: wanduow/action-j2lint@v1
+        uses: wandansible/action-j2lint@v1
 ```
