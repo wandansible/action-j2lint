@@ -9,6 +9,7 @@ RUN apt-get update && \
       jq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory '*' \
     && python3 -m venv /opt/venv \
     && /opt/venv/bin/pip --no-cache-dir --no-input install --upgrade --requirement /requirements.txt
 
