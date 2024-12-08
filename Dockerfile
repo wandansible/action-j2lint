@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.13-slim
 
 COPY requirements.txt /requirements.txt
 COPY entrypoint.sh /entrypoint.sh
